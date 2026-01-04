@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>PreMedi N.CER - 통합 CDSS (최종 수정판)</title>
+    <style>
+        :root { --primary: #4f46e5; --crt: #ef4444; --warn: #f59e0b; --bg: #f3f4f6; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg); color: #1f2937; }
+        
+        /* 레이아웃 */
+        .sidebar { width: 400px; background: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+        .main { flex: 1; padding: 25px; display: flex; flex-direction: column; gap: 20px; overflow: hidden; }
+        
+        /* 헤더 */
+        .header { padding: 20px; border-bottom: 1px solid #e5e7eb; background: white; }
+        .title { font-size: 20px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .badge { background: #1f2937; color: white; padding: 3px 8px; border-radius: 6px; font-size: 11px; }
+
+        /* 탭 스타일 */
+        .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+        .tab { padding: 8px 12px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 20px; background: white; cursor: pointer; color: #6b7280; transition: 0.2s; font-weight: 500; }
+        .tab:hover { border-color: var(--primary); color: var(--primary); }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); font-weight: 700; }
+
+        /* 리스트 스타일 */
+        .list-container { flex: 1; overflow-y: auto; padding: 12px; }
+        .item { padding: 16px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 8px; background: white; cursor: pointer; transition: 0.2s; position: relative; }
+        .item:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .item.selected { border: 2px solid var(--primary); background: #eef2ff; }
+        .item.selected::after { content: '✔'; position: absolute; right: 15px; top: 15px; color: var(--primary); font-weight: bold; }
+        
+        .item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .item-title { font-size: 14px; font-weight: 700; color: #111; }
+        .item-sub { font-size: 12px; color: #6b7280; }
+        .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .tag.crt { background: #fee2e2; color: #991b1b; }
+        .tag.warn { background: #fef3c7; color: #92400e; }
+        .tag.info { background: #e0f2fe; color: #075985; }
+
+        /* 결과 패널 */
+        .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; flex: 1; min-height: 0; }
+        .panel { background: white; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
+        
+        .p-head { padding: 15px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 15px; }
+        .p-body { flex: 1; padding: 25px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; font-size: 14px; }
+        
+        .med { border-top: 5px solid #374151; }
+        .med .p-body { font-family: 'Pretendard', sans-serif; color: #374151; background: #fafafa; }
+        .pat { border-top: 5px solid #f59e0b; background: #fffbeb; }
+        .pat .p-body { color: #4b5563; font-size: 15px; }
+
+        /* 버튼 */
+        .footer { margin-top: auto; display: flex; justify-content: flex-end; gap: 10px; }
+        .btn { padding: 12px 24px; border-radius: 8px; font-weight: 700; cursor: pointer; border: none; font-size: 14px; transition: 0.2s; }
+        .btn-reset { background: #f3f4f6; color: #4b5563; }
+        .btn-reset:hover { background: #e5e7eb; }
+        .btn-copy { background: var(--primary); color: white; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3); }
+        .btn-copy:hover { background: #4338ca; transform: translateY(-1px); }
+
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="header">
+        <div class="title">🏥 PreMedi N.CER <span class="badge">Final Ver</span></div>
+        <div style="font-size:12px; color:#6b7280; margin-top:6px;">Stoelting + User Text Data [153-304]</div>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="list-container" id="list"></div>
+</div>
+
+<div class="main">
+    <div class="panels">
+        <div class="panel med">
+            <div class="p-head">
+                <span>👨‍⚕️ Medical Record (EMR)</span>
+                <span style="font-size:12px; font-weight:400; color:#6b7280;">차팅/동의서용</span>
+            </div>
+            <div id="outMed" class="p-body" style="color:#9ca3af; text-align:center; padding-top:150px;">
+                좌측 리스트에서 환자의 질환을 선택하세요.
+            </div>
+        </div>
+        <div class="panel pat">
+            <div class="p-head" style="color:#92400e;">
+                <span>📱 Patient Guide (App)</span>
+                <span style="font-size:12px; font-weight:400; color:#b45309;">환자/보호자 설명용</span>
+            </div>
+            <div id="outPat" class="p-body" style="color:#9ca3af; text-align:center; padding-top:150px;">
+                환자가 이해하기 쉬운 설명이 생성됩니다.
+            </div>
+        </div>
+    </div>
+    <div class="footer">
+        <button class="btn btn-reset" onclick="resetAll()">초기화</button>
+        <button class="btn btn-copy" onclick="copyResult()">📋 전체 복사</button>
+    </div>
+</div>
+
+<script>
+    /* [통합 데이터셋] 
+       주의: 백틱(`)을 사용하여 줄바꿈 오류를 방지했습니다. 
+       이 부분은 절대 수정하지 마시고 그대로 사용하세요.
+    */
+    const masterData = [
+        // --- 1. General / History ---
+        { id: 'src_153', cat: 'special', lvl: 'crt', label: '아나필락시스 과거력', sub: 'Anaphylactoid reaction', 
+          med: `anaphylactoid reaction 발생시 Peri-op cardiovascular cx.(malignant arrhythmia, Myocardial Infarction, Heart Failure, Sudden Cardiac Death 등) 발생 가능성 및 이로 인한 ICU/Ventilator care 가능성에 대해 인지동의서 시행하세요.`, 
+          pat: `과거 심한 알레르기 반응이 있었던 경우, 마취 중 심장 합병증이 발생할 수 있어 이에 대한 철저한 준비와 집중 치료 가능성을 미리 설명드립니다.` },
+        
+        { id: 'src_154', cat: 'respi', lvl: 'warn', label: 'COVID-19 감염력', sub: '7주/10일 기준', 
+          med: `코로나 19 감염력이 있는 환자의 경우 수술 후 합병증 가능성을 고려하여 검사 양성일로부터 7주 이후 정규 수술을 하는 것을 권고하나 7주 이내에 정규수술을 시행하고자 하는 경우 10일 이후 하는 것을 권고합니다.\n\n수술을 이보다 앞당겨 시행하는 경우 peri postop respiratory Cx.(asthma or COPD attack, atelectasis, pneumonia, pul. edema, respiratory failure) 발생 가능성 및 이로 인한 ICU/ventilator care 가능성에 대해 설명하고 OP risk /benefit 고려하여 환자 및 보호자와 충분희 상의 후 인지동의서 시행하세요.`, 
+          pat: `코로나 확진 후 폐 기능 회복을 위해 7주 이후 수술을 권장합니다. 일정을 당길 경우 폐렴 등 합병증 위험이 높아질 수 있음을 이해해 주시기 바랍니다.` },
+        
+        { id: 'src_158', cat: 'hepatic', lvl: 'warn', label: '짧은 수술 간격', sub: 'Short op interval', 
+          med: `short op interval로 인한 peri-postop hepatic cx 발생 가능성에 대해 설명하세요.\n\nshort interval로 수술을 해야하는 이유에 대한 충분한 설명과 함께, short op interval로 인한 peri-postop renal, hepatic cx 발생 가능성에 대해 인지동의서 시행하세요.`, 
+          pat: `반복적인 수술과 마취는 간과 신장에 부담을 줄 수 있습니다. 불가피하게 짧은 간격으로 수술하는 이유와 위험성에 대해 설명드립니다.` },
+        
+        { id: 'src_161', cat: 'special', lvl: 'warn', label: '치아 손상 위험', sub: 'Loose teeth', 
+          med: `수술중 또는 전신마취중 치아손상 가능성에 대해 설명하고 치아인지동의서 시행하였습니다.`, 
+          pat: `흔들리는 치아가 있는 경우 마취를 위한 기도 삽관 과정에서 치아가 손상될 수 있음을 미리 알려드립니다.` },
+
+        // --- 2. Cardiovascular ---
+        { id: 'src_163', cat: 'cardio', lvl: 'warn', label: '고령 (Old Age)', sub: '> 4METs', 
+          med: `Old age로 인한 peri-op cardio-pulmonary complications 발생 가능성에 대해 인지동의서 시행하세요.`, 
+          pat: `고령의 환자분은 수술과 마취로 인해 심장과 폐에 합병증이 발생할 위험이 일반인보다 높아 주의 깊은 관리가 필요합니다.` },
+        
+        { id: 'src_166', cat: 'cardio', lvl: 'warn', label: '고혈압 (HTN)', sub: 'BP Control', 
+          med: `BP < 140/90으로 조절하세요.\nAntihypertensive medication은 anticoagulant를 제외하고 op 당일까지 복용하도록 해 주십시오.\nOR에서 BP 조절 안될시 수술지연가능성에 대해 설명하세요.\nHTN medi 중 ARB, ACEi 는 수술 24시간 전 복용 중단하세요.`, 
+          pat: `혈압은 140/90 이하로 조절되어야 합니다. 대부분의 혈압약은 당일까지 드시되, 일부(ARB, ACEi) 약제는 수술 전날부터 중단해 주십시오.` },
+        
+        { id: 'src_168', cat: 'cardio', lvl: 'warn', label: '부정맥/혈역학 불안정', sub: 'Arrhythmia', 
+          med: `OR에서 HR 조절 안될시 OP delay 가능성에 대해 환자/보호자에게 설명하세요.\nPeri-OP hemodynamic instability 가능성에 대해 설명하세요.\nPeri-op cardiovascular cx.(malignant arrhythmia, Myocardial Infarction, Heart Failure, Sudden Cardiac Death 등) 발생 가능성 및 이로 인한 ICU/Ventilator care 가능성에 대해 인지동의서 시행하세요.`, 
+          pat: `수술 중 심박수가 조절되지 않으면 수술이 미뤄질 수 있습니다. 부정맥으로 인한 혈압 불안정 및 심장 합병증 가능성이 있습니다.` },
+        
+        { id: 'src_171', cat: 'cardio', lvl: 'crt', label: '관상동맥 스텐트 (PCI)', sub: 'DES/BMS 기간 확인', 
+          med: `PCI 시행 받은 환자에서 elective op인 경우 bare metal stent는 30~45일 후, drug eluting stent인 경우 1년 후 op하는 것이 원칙입니다.\nop에 따른 risk/benefit 고려 후 op진행하시고, anti-plt제제 사용은 CA 컨설트대로 시행하십시오.\nperi-postop cardiovascular cx(MI, IHD, CHF, mailig. arrhythmia, sudden cardiac arrest) 발생가능성, anti-coagulant 유지로 인한 peri-postop bleeding tendency, massive transfusion, DIC 발생가능성, 이로 인한 ICU/ventilator care 가능성에 대해 충분히 설명 후 인지동의서 시행하세요.`, 
+          pat: `스텐트 시술 후 일정 기간(금속스텐트 1달, 약물스텐트 1년)이 지나야 안전합니다. 혈전 방지제 복용과 출혈 위험 사이의 균형을 맞춰 수술합니다.` },
+
+        // --- 3. Respiratory ---
+        { id: 'src_177', cat: 'respi', lvl: 'crt', label: '결핵 의심 (Tb)', sub: 'Active Tb r/o', 
+          med: `CXR 상 TB 의심 소견에 대해 sputum AFB stain 3회 & TB/RFP 내성 PCR 결과 확인 필요합니다. 시행 및 결과 확인 후 acceptable 시 op.하세요.\nTB 가능성 완전히 배제되지 않은 환자로, 수술방 감염관리 상 귀과적으로 마지막 순서로 arrange 해주세요.\nActive Tb 의심되는 환자로 infectivity 소실 이후 수술하는 것이 좋겠으나 수술 급할시 감염관리상 당일 마지막 수술로 진행하시고, 수술 당일 수술 시각과 수술실, 술전 수술실 준비에 대해 술 전 마취통증의학과와 상의하십시오.`, 
+          pat: `결핵이 의심되어 정밀 검사가 필요합니다. 전염력이 없다는 것이 확인될 때까지 수술을 미루거나, 급한 경우 격리된 상태로 마지막 순서에 수술합니다.` },
+        
+        { id: 'src_182', cat: 'respi', lvl: 'warn', label: '천식 (Asthma)', sub: 'Inhaler 지참', 
+          med: `PU 회신대로 전처치 시행하세요.\nOp시 inhaler, nebeulizer op room 으로 내려주세요.\nperi-postop respiratory cx.(asthma or COPD attack, atelectasis, pneumonia, pul.edema, respi. failure) 발생 가능성 및 이로 인한 ICU/ventilator care 가능성에 대해 인지동의서 시행하세요.`, 
+          pat: `수술 중 천식 발작 예방을 위해 호흡기 내과 처방을 따르며, 사용하시던 흡입기를 수술실로 꼭 가져와 주세요.` },
+
+        // --- 4. Hepatic ---
+        { id: 'src_185', cat: 'hepatic', lvl: 'warn', label: '간수치 상승 (LFT)', sub: 'Elevated LFT', 
+          med: `LFT f/u 하고 감소추세 확인하세요.\nperi-postop hepatic cx 발생가능성에 대해 설명하세요.\nPeri-op hepatic Cx.(fulminent hepatitis, hepatic failure 등) 발생 가능성 및 이로 인한 ICU/Ventilator care 가능성에 대해 설명하세요.`, 
+          pat: `간 수치가 높아 수술 후 간 기능이 더 나빠질 위험이 있습니다. 수치가 떨어지는 추세를 확인 후 수술하는 것이 안전합니다.` },
+        
+        { id: 'src_188', cat: 'hepatic', lvl: 'crt', label: '간경변 (LC)', sub: 'Varix Rupture Risk', 
+          med: `Peri-op hepatic Cx.(acute hepatitis, fulminent hepatitis, liver failure 등) 발생 가능성 및 이로 인한 ICU/Ventilator care 가능성에 대해 인지동의서 시행하세요.\nvarix rupture 나 갑작스런 massive bleeding 발생 가능성 및 이로 인한 ICU/Ventilator care 가능성에 대해 인지동의서 시행하세요.`, 
+          pat: `간경화로 인해 수술 중 식도 정맥류 파열이나 대량 출혈 위험이 있어 중환자실 집중 치료 가능성을 열어두고 수술합니다.` },
+
+        // --- 5. Renal ---
+        { id: 'src_192', cat: 'renal', lvl: 'warn', label: '소변검사 이상', sub: 'Abn U/A', 
+          med: `U/A f/u 하고 acceptable시 op하세요. Abnormal 소견 지속시 NE c 시행 후 회신하세요.\nPeri-op renal cx.(ARF, CRF 등) 발생 가능성 및 이로 인한 응급 Hemodialysis 시행, ICU/Ventilator care 가능성에 대해 설명하세요.`, 
+          pat: `소변 검사 이상 소견에 대해 신장내과 확인이 필요합니다. 수술 후 일시적으로 투석이 필요할 수도 있음을 설명드립니다.` },
+        
+        { id: 'src_200', cat: 'renal', lvl: 'crt', label: '고칼륨혈증 (HyperK)', sub: 'K > 5.0', 
+          med: `K 3.0-5.0 사이로 조절 후 op 진행하세요. Hyperkalemia 소견 지속시 op delay 가능성 설명하시기 바랍니다.\nHyperkalemia의 경우 수술방에서의 조절이 ward에서 조절하는 것보다 어렵습니다.\nHyperkalemia 지속시 op delay가능성 설명하고, cardiac complication 발생 가능성에 대해 인지동의서 시행하세요.`, 
+          pat: `혈액 내 칼륨 수치가 높으면 심장에 위험하므로, 수치를 3.0-5.0 사이로 낮춘 후 수술을 진행해야 합니다.` },
+
+        // --- 6. Endocrine ---
+        { id: 'src_204', cat: 'endo', lvl: 'warn', label: '당뇨 (DM)', sub: 'BS Control', 
+          med: `BS 120-200으로 strict하게 조절하세요. BS 조절되지 않을시 수술 delay 가능성에 대해서 설명하세요.\nBS control 되지 않는 분으로 전신마취 하 op risk 높은 분으로 op에 따르는 risk/benefit 충분히 고려하시기 바랍니다.\n수술당일 아침까지 BS 확인하신 후 당일 마취통증의학과와 상의하시기 바랍니다.`, 
+          pat: `혈당을 120-200 사이로 엄격하게 조절해야 합니다. 조절되지 않으면 감염 위험 등으로 수술이 연기될 수 있습니다.` },
+        
+        { id: 'src_208', cat: 'endo', lvl: 'warn', label: '스테로이드 사용력', sub: 'Adrenal Insufficiency', 
+          med: `EC c 회신대로 steroid coverage 시행 바랍니다.\n2ndary adrenal insufficiency 에 의한 peri-postop hemodynamic instability, e' imbalance, fluid retention, delayed emergence 발생가능성에 대해 인지동의서 시행하세요.\nPeri-op hemodynamic instability 가능성에 대해 설명하세요.`, 
+          pat: `장기간 스테로이드 사용으로 부신 기능이 약해져 있을 수 있어, 수술 중 호르몬 보충 요법이 필요할 수 있습니다.` },
+        
+        { id: 'src_213', cat: 'endo', lvl: 'crt', label: '부신 종양', sub: 'Adrenal Incidentaloma', 
+          med: `pheochromocytoma 가능성 낮지만 완전히 배제할 수 없습니다. Peri-postop hemodynamic instability, electolyte imbalance, hypertensive crisis 및 major organ damage 발생 가능성 및 이로 인한 ICU/ventilator care 발생가능성에 대하여 충분히 설명 후 인지동의서 시행하세요.`, 
+          pat: `부신 종양이 호르몬을 분비할 경우 혈압이 급격히 변할 수 있어, 이에 대비한 정밀 감시하에 수술을 진행합니다.` },
+        
+        { id: 'src_216', cat: 'endo', lvl: 'warn', label: '갑상선 질환', sub: 'Hyper/Hypo Thyroid', 
+          med: `euthyroid state 확인 후 op 진행하세요.\n[Hypo] Hypothyroidism으로 인해 수술 중 출혈의 위험이 증가하고, 마취제 및 진통제에 대한 감수성이 증가하며, 수술 후 호흡부전... 인지 동의서 시행하세요.\n[Hyper] peri-postop hemodynamic instability, thyroid storm, hyperthermia... 발생가능성 인지동의서 시행하세요.`, 
+          pat: `갑상선 수치가 정상일 때 수술하는 것이 가장 안전합니다. 기능 저하증이나 항진증 상태에서는 회복 지연이나 심장 합병증 위험이 있습니다.` },
+
+        // --- 7. Fever / Hematologic ---
+        { id: 'src_222', cat: 'infect', lvl: 'warn', label: '발열 (Fever)', sub: 'Op Delay', 
+          med: `상환 최근까지 Fever 발생한 상태로 subside 후 수술 진행하는 것이 안전하겠습니다.\n다만 수술 부위와 관련된 fever로 판단될 경우 당일 마취과와 상의하십시오.\n수술당일 fever 발생시 op delay 가능성에 대해 충분히 설명하시고, evaluation 되지 않은 기존 질환의 악화 가능성에 대해 인지동의서 시행하세요`, 
+          pat: `열이 나는 상태에서는 수술 위험이 높으므로 열이 내린 후 진행하는 것이 원칙입니다. 당일 열이 나면 수술이 연기될 수 있습니다.` },
+        
+        { id: 'src_226', cat: 'heme', lvl: 'warn', label: '빈혈/출혈', sub: 'Anemia/PT Prolong', 
+          med: `귀과적 수술 규모 및 출혈량 고려하여 수혈 또는 혈액제제 준비해 주시기 바랍니다.\n응급 수혈 가능성에 대해 설명하세요.\n[PT Prolong] Anticoagulant 복용 중단시 thromboembolic event(angina, MI, cerebral infarction...) 및 복용 중단 시기에 따라서는 bleeding 가능성이 있음을 설명하고 인지동의서 시행하세요.`, 
+          pat: `수술 중 출혈 가능성에 대비해 수혈을 준비합니다. 혈전 약물을 끊으면 혈전 위험이, 유지하면 출혈 위험이 있어 균형 잡힌 관리가 필요합니다.` },
+
+        // --- 8. Rheumatologic ---
+        { id: 'src_233', cat: 'special', lvl: 'crt', label: '류마티스 (RA/SLE)', sub: 'C-spine/Airway', 
+          med: `Difficult intubation과 이로 인한 neck, tooth injury, hypoxic brain damage, fiberoptic intubation, 응급 tracheostomy, awake intubation, op delay 가능성 설명하고 인지동의서 시행하세요.\n[SLE/RA] atlanto-axial subluxation 가능성 및 intubation risk에 대해 OS note 남겨주세요.`, 
+          pat: `류마티스 관절염으로 목 관절이 불안정할 수 있어, 목을 보호하며 특수 장비로 조심스럽게 마취를 유도합니다.` },
+
+        // --- 9. Neuro ---
+        { id: 'src_246', cat: 'neuro', lvl: 'warn', label: '뇌졸중/뇌병변', sub: 'Stroke/Mass', 
+          med: `Peri-op cerebrovascular Cx.(Cerebral infartion, cerebral hemorrhage 등) 발생 가능성 및 이로 인한 ICU/Ventilator care 가능성에 대해 인지동의서 시행하세요.\nPeri-op neurologic Cx 발생 가능성에 대해 인지동의서 시행하세요.`, 
+          pat: `뇌혈관 질환 과거력이 있는 경우 수술 스트레스로 인해 뇌졸중 등이 재발할 위험이 있어 집중 관리가 필요합니다.` },
+        
+        { id: 'src_250', cat: 'neuro', lvl: 'crt', label: '중증 근무력증 (MG)', sub: 'Myasthenia Gravis', 
+          med: `MG의 가능성은 적으나 만약의 경우 delayed emergence, weaning failure, cholinergic crisis 및 이로 인한 ICU/Ventilator care 가능성에 대해 인지동의서 시행하세요.\nPeri/post op neurologic cx.발생가능성(delirium, seizure attack, delayed emergence 등) 인지동의서 시행하세요.`, 
+          pat: `근무력증으로 인해 마취 후 자가 호흡 회복이 늦어질 수 있어, 필요시 인공호흡기 치료를 받을 수 있음을 설명드립니다.` },
+
+        // --- 10. Trauma/Ortho ---
+        { id: 'src_260', cat: 'special', lvl: 'crt', label: '안면/경추 손상', sub: 'Facial Fx/C-spine', 
+          med: `Difficult intubation과 이로 인한 neck, tooth injury, hypoxic brain damage, fiberoptic intubation, awake intubation, 응급 tracheostomy, op delay 가능성 설명하고 인지동의서 시행하세요.\n[C-spine] Difficult intubation과 이로 인한 neck, tooth & cord injury... op delay 가능성 설명하고 hyperextension시 생길 수 있는 cord injury에 대해 설명하세요.`, 
+          pat: `안면 골절이나 목 디스크로 인해 기도 확보가 어려울 수 있습니다. 신경 손상을 막기 위해 특수 내시경을 이용해 안전하게 마취합니다.` },
+
+        { id: 'src_272', cat: 'respi', lvl: 'warn', label: '척추측만증', sub: 'Scoliosis', 
+          med: `Peri-op cardiovascular cx.(malignant arrhythmia...) 발생 가능성...\nPeri-op respiratory cx.(atelectasis, pneumonia, ARDS...) 발생 가능성...\nDifficult intubation과 이로 인한 neck, tooth injury... 인지동의서 시행하세요`, 
+          pat: `척추측만증으로 인해 심장과 폐 기능에 영향이 있을 수 있어, 수술 전후 합병증 예방에 최선을 다하겠습니다.` },
+
+        // --- 11. Psych ---
+        { id: 'src_277', cat: 'neuro', lvl: 'warn', label: '우울증 (MDD)', sub: 'High Risk', 
+          med: `peri-postop neuropsychiatric sx 악화 가능성, postop delirium 발생가능성에 대해 인지동의서 시행하세요.\nPY op risk high 인 분으로 귀과적 수술의 risk/benefit 고려하여 환자 및 보호자와 수술 진행 여부 충분히 상의하세요.\n수술 24시간 전후 보호자 상주할 수 있도록 해주세요.`, 
+          pat: `수술 후 일시적인 섬망이나 우울감 악화가 올 수 있어 보호자분의 24시간 상주가 필요합니다.` },
+
+        // --- 12. Obesity ---
+        { id: 'src_281', cat: 'special', lvl: 'warn', label: '고도 비만', sub: 'BMI > 35', 
+          med: `Obesity로 인한 delayed emergence 및 difficult intubation, 이로 인한 neck, tooth injury, hypoxic brain damage, awake intubation, 응급 tracheostomy 가능성 설명하세요.\nBMI>35 인 환자로, room air ABGA 시행 및 결과 확인 후 acceptable 시 op.하세요.`, 
+          pat: `고도 비만인 경우 기도 확보가 어렵고 마취 회복이 느릴 수 있습니다. 안전을 위해 특수 장비를 준비하고 산소 수치를 면밀히 확인합니다.` },
+
+        // --- 13. JW (No Blood) ---
+        { id: 'src_285', cat: 'special', lvl: 'crt', label: '무수혈 (JW)', sub: 'Refusal of Blood', 
+          med: `수혈 거부하는 분으로 과다출혈로 인한 다발성 장기 손상 및 이로 인한 ICU/Ventilator care 가능성, 뇌손상 등으로 인한 일시적,영구적 후유증 발생가능성, 사망 가능성 인지동의서 시행하시고 이와 관련 마취과 상의 후 OP 진행하세요.`, 
+          pat: `무수혈 원칙을 존중하나, 대량 출혈 시 장기 손상이나 생명의 위험이 따를 수 있음을 충분히 인지해 주셔야 합니다.` },
+
+        // --- 14. C-sec/LMS ---
+        { id: 'src_288', cat: 'special', lvl: 'warn', label: '제왕절개 (C-sec)', sub: 'Anesthesia Plan', 
+          med: `전신마취, 척추마취, IV PCA 에 대하여 설명하였습니다.\nDifficult intubation과 이로 인한 neck, tooth injury... op delay 가능성 설명하고 인지동의서 시행하세요.`, 
+          pat: `산모와 태아에게 가장 안전한 마취 방법(척추마취 등)과 통증 조절 방법에 대해 설명드렸습니다.` },
+
+        { id: 'src_291', cat: 'special', lvl: 'crt', label: '후두 미세 수술 (LMS)', sub: 'Shared Airway', 
+          med: `현 상태 및 intubation 관련하여 OL note 남겨주세요.\nDifficult intubation과 이로 인한 neck, tooth injury, hypoxic brain damage, fiberoptic intubation, 응급 tracheostomy, awake intubation, op delay 가능성 설명하세요.`, 
+          pat: `성대 수술은 기도를 공유하므로 마취 관리가 까다롭습니다. 치아 손상 예방과 안전한 호흡 유지를 위해 최선을 다하겠습니다.` },
+
+        // --- 15. Emergency ---
+        { id: 'src_300', cat: 'special', lvl: 'crt', label: '응급 수술 (Emergency)', sub: 'Full Stomach', 
+          med: `Emergency op의 위험성, 각 과거력에 따른 peri-op complication 가능성에 대해 설명하세요.\nPeri-op cardiovascular cx... Peri-op respiratory cx... Peri-op renal cx... Peri-op hepatic Cx... Peri-op bleeding tendency... Peri-OP hemodynamic instability 가능성 및 이로 인한 ICU/Ventilator care 가능성 에 대해 인지동의서 시행하세요.`, 
+          pat: `응급 수술은 금식 시간이 부족하고 준비가 완벽하지 않아 합병증 위험이 정규 수술보다 높습니다. 발생 가능한 모든 위험에 대해 대비하고 수술을 진행합니다.` }
+    ];
+
+    // ============================================================
+    // Logic Engine
+    // ============================================================
+    const cats = {
+        'all': '전체', 'cardio': '심장', 'respi': '호흡기', 'hepatic': '간/소화기',
+        'renal': '신장', 'endo': '내분비', 'neuro': '신경', 'heme': '혈액', 
+        'infect': '감염', 'special': '특수/응급'
+    };
+    
+    let curCat = 'all';
+    let selIds = new Set();
+
+    const tabBox = document.getElementById('tabs');
+    Object.keys(cats).forEach(k => {
+        const b = document.createElement('div');
+        b.className = `tab ${k==='all'?'active':''}`;
+        b.innerText = cats[k];
+        b.onclick = () => { curCat = k; render(); updateTabs(); };
+        tabBox.appendChild(b);
+    });
+
+    function updateTabs() {
+        Array.from(tabBox.children).forEach(c => {
+            c.classList.toggle('active', c.innerText === cats[curCat]);
+        });
+    }
+
+    function render() {
+        const listBox = document.getElementById('list');
+        const filtered = curCat === 'all' ? masterData : masterData.filter(d => d.cat === curCat);
+        
+        listBox.innerHTML = filtered.map(d => `
+            <div class="item ${selIds.has(d.id)?'selected':''}" onclick="toggle('${d.id}')">
+                <div class="item-head">
+                    <span class="item-title">${d.label}</span>
+                    <span class="tag ${d.lvl}">${d.lvl.toUpperCase()}</span>
+                </div>
+                <div class="item-sub">${d.sub}</div>
+            </div>
+        `).join('');
+    }
+
+    function toggle(id) {
+        if(selIds.has(id)) selIds.delete(id); else selIds.add(id);
+        render();
+        print();
+    }
+
+    function print() {
+        const medBox = document.getElementById('outMed');
+        const patBox = document.getElementById('outPat');
+        
+        if(selIds.size === 0) {
+            medBox.innerHTML = '<div style="color:#9ca3af; text-align:center; padding-top:150px;">좌측 리스트에서 환자의 질환을 선택하세요.</div>';
+            patBox.innerHTML = '<div style="color:#9ca3af; text-align:center; padding-top:150px;">환자가 이해하기 쉬운 설명이 생성됩니다.</div>';
+            return;
+        }
+
+        const items = masterData.filter(d => selIds.has(d.id));
+        
+        medBox.innerHTML = items.map(d => `
+            <div style="margin-bottom:20px;">
+                <strong style="color:#111; font-size:15px;">▶ ${d.label}</strong>
+                <div style="margin-top:6px; padding-left:12px; border-left:4px solid #cbd5e1; font-size:13.5px; line-height:1.7;">${d.med.replace(/\n/g, '<br>')}</div>
+            </div>`).join('');
+            
+        patBox.innerHTML = items.map(d => `
+            <div style="margin-bottom:20px;">
+                <strong style="color:#111; font-size:15px;">✅ ${d.label}</strong>
+                <div style="margin-top:6px; font-size:14px;">${d.pat}</div>
+            </div>`).join('');
+    }
+
+    function resetAll() {
+        selIds.clear();
+        render();
+        print();
+    }
+
+    function copyResult() {
+        if(selIds.size === 0) return alert('선택된 항목이 없습니다.');
+        const items = masterData.filter(d => selIds.has(d.id));
+        const txt = items.map(d => `[${d.label}]\n${d.med}`).join('\n\n');
+        navigator.clipboard.writeText(txt).then(() => alert('EMR 기록 복사 완료'));
+    }
+
+    // Start
+    render();
+</script>
+</body>
+</html>
